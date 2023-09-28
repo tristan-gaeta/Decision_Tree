@@ -11,8 +11,8 @@ class Tree:
         self.root = None
 
     def create(self,train,tune):
+        issues = [i for i in range(len(train[0][2]))]
         p_d = 0 #calculate initial entropy
-        issues = [i for i in range(len(train[0][2]) - 1)]
         for datum in train:
             if datum[1] == 'D': p_d += 1
         p_d /= len(train)
@@ -27,13 +27,13 @@ class Tree:
         e2 = -p2*log2(p2)
         return e1 + e2 #bits of entropy
 
-    def __recurse__(self, data, issues, entropy, prev_maj):
+    def __recurse__(self, data, issues, entropy, majority):
+        majority = self.__majority__(data) or majority #keep track of most recent majority
         #base cases
-        prev_maj = self.__majority__(data) or prev_maj
         if len(data) == 0 or len(issues) == 0: 
-            return prev_maj 
-        same_house = True
-        same_record = True
+            return majority 
+        same_house = True   #if all representatives are in same house 
+        same_record = True  #if all representatives have same record 
         for datum in data:
             if datum[1] != data[0][1]:
                 same_house = False
@@ -42,7 +42,7 @@ class Tree:
             if not same_record and not same_house:
                 break
         if same_record or same_house:
-            return prev_maj
+            return majority
         #Find best split
         max_gain = float('-inf')
         child_entropies = None
@@ -109,13 +109,13 @@ class Tree:
             else: raise AssertionError("Unrecognized token!")
         #recurse
         child_issues = [i for i in issues if i != top_issue]
-        yea = self.__recurse__(yea,child_issues,child_entropies[0],prev_maj)
-        nay = self.__recurse__(nay,child_issues,child_entropies[1],prev_maj)
-        present = self.__recurse__(present,child_issues,child_entropies[2],prev_maj)
+        yea = self.__recurse__(yea,child_issues,child_entropies[0],majority)
+        nay = self.__recurse__(nay,child_issues,child_entropies[1],majority)
+        present = self.__recurse__(present,child_issues,child_entropies[2],majority)
 
-        if yea == nay == present:
+        if yea == nay == present:   #if all same classification, turn into leaf
             return yea
-        return Tree.Node(top_issue,yea,nay,present,prev_maj)
+        return Tree.Node(top_issue,yea,nay,present,majority)
 
     def classify(self,votes):
         def rec(node):
@@ -279,6 +279,7 @@ if __name__ == "__main__":
     data = []
     for line in file.readlines():
         member_id, party, votes = line.split('\t')
+        votes = votes.removesuffix('\n')
         data.append((member_id,party,votes))
     file.close()
     train, tune = split_data(data,None)
